@@ -91,6 +91,8 @@
   <div id="waterbar"><i></i></div>
   <span id="watertxt" style="font-size:12px;font-weight:bold">3000/3000</span>
 </div>
+<button id="unstuck" class="ui panel" onclick="unstuck()"
+  style="top:54px;left:14px;padding:6px 12px;font-weight:bold;color:var(--ink);cursor:pointer;font-family:inherit;font-size:12px">🧭 UNSTUCK</button>
 
 <!-- TOP BAR -->
 <div id="topbar" class="ui panel">
@@ -144,11 +146,11 @@
     <div class="keys">
       <span class="kbd">W A S D — move</span>
       <span class="kbd">SPACE / Click — use tool</span>
-      <span class="kbd">1–7 — pick tool</span>
-      <span class="kbd">🥅 Net + SPACE — catch spirits</span>
-      <span class="kbd">C — Farm Spirits</span>
-      <span class="kbd">E — pouch</span>
-      <span class="kbd">M — market</span>
+      <span class="kbd">1–8 — pick tool</span>
+      <span class="kbd">🥅 Net — catch spirits</span>
+      <span class="kbd">🎣 Rod — fish the pond</span>
+      <span class="kbd">C — Farm Spirits · E — pouch · M — market</span>
+      <span class="kbd">U / 🧭 button — unstuck</span>
     </div>
     <p style="font-size:12px;color:var(--ink-l)">The glowing tile in front of you is where your tool acts.<br>Follow the quest tracker (bottom-right) to learn the loop.</p>
     <button class="b" style="margin-top:14px;font-size:15px;padding:9px 26px" onclick="document.getElementById('intro').style.display='none'">▶ PLAY</button>
@@ -165,7 +167,7 @@ window.addEventListener('resize',resize); resize();
 ctx.imageSmoothingEnabled=false;
 
 //=================== STATE ===================
-const inv={gold:105,farm:0,stars:0,seeds:5,maxSeeds:30,produce:0,wood:0,stone:0,crystal:0,eggs:0};
+const inv={gold:105,farm:0,stars:0,seeds:5,maxSeeds:30,produce:0,wood:0,stone:0,crystal:0,eggs:0,fish:0};
 let level=1,xp=0,xpNext=100,land=9;
 let water=3000, waterMax=3000;
 let tools=[
@@ -175,7 +177,8 @@ let tools=[
   {id:'hammer',em:'🔨',lb:'HAMMER',key:'4'},
   {id:'seeds',em:'🌱',lb:'SEEDS',key:'5'},
   {id:'net',em:'🥅',lb:'NET',key:'6'},
-  {id:'pouch',em:'🎒',lb:'POUCH',key:'7'},
+  {id:'rod',em:'🎣',lb:'ROD',key:'7'},
+  {id:'pouch',em:'🎒',lb:'POUCH',key:'8'},
 ];
 let sel=0;
 let dailyClaimed=false;
@@ -202,10 +205,20 @@ function gen(){
     if(n<0.16) map[y][x].t='tree';
     else if(n<0.205) map[y][x].t='rock';
   }
+  carvePond();
+}
+const PONDX=Math.floor(COLS/2)+6, PONDY=Math.floor(ROWS/2)+5;
+function carvePond(){
+  for(let y=2;y<ROWS-2;y++)for(let x=2;x<COLS-2;x++){
+    if(Math.hypot(x-PONDX,(y-PONDY)*1.25)<3.4){
+      const c=map[y][x];
+      if(c.t!=='coop' && !c.crop){ c.t='water'; c.coopT=0; }
+    }
+  }
 }
 gen();
 
-function solid(t){return t==='tree'||t==='rock'||t==='coop';}
+function solid(t){return t==='tree'||t==='rock'||t==='coop'||t==='water';}
 
 //=================== INPUT ===================
 addEventListener('keydown',e=>{
@@ -216,7 +229,8 @@ addEventListener('keydown',e=>{
   if(k==='e'){toggleModal('m-pouch'); refreshPouch();}
   if(k==='m'){toggleModal('m-market'); refreshMarket();}
   if(k==='c'){ crittersPanel(); }
-  if(['1','2','3','4','5','6','7'].includes(k)){ selectSlot(+k-1); }
+  if(k==='u'){ unstuck(); }
+  if(['1','2','3','4','5','6','7','8'].includes(k)){ selectSlot(+k-1); }
 });
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 
@@ -305,6 +319,7 @@ function useTool(){
     } else toast('Hammer builds on grass / collects from coops');
   }
   else if(tool==='net'){ tryCatch(); }
+  else if(tool==='rod'){ castRod(tx,ty); }
   else if(tool==='pouch'){ toggleModal('m-pouch',true); refreshPouch(); }
   refreshHUD();
 }
@@ -341,10 +356,10 @@ function gainXP(n){
 }
 
 //=================== ECONOMY ===================
-const PRICES={produce:12,wood:5,stone:7,eggs:9,crystal:40};
+const PRICES={produce:12,wood:5,stone:7,eggs:9,crystal:40,fish:15};
 function refreshMarket(){
   const box=document.getElementById('market-sell'); box.innerHTML='';
-  const items=[['produce','🍎 Produce'],['wood','🪵 Wood'],['stone','🪨 Stone'],['eggs','🥚 Eggs'],['crystal','💎 Crystal']];
+  const items=[['produce','🍎 Produce'],['fish','🐟 Fish'],['wood','🪵 Wood'],['stone','🪨 Stone'],['eggs','🥚 Eggs'],['crystal','💎 Crystal']];
   items.forEach(([k,name])=>{
     const have=inv[k]||0;
     const r=document.createElement('div'); r.className='row';
@@ -376,7 +391,7 @@ function claimDaily(){
 //=================== POUCH ===================
 function refreshPouch(){
   const g=document.getElementById('pouch-grid'); if(!g)return;
-  const items=[['🪙',inv.gold,'Gold'],['🌾',inv.farm,'$FARM'],['🌱',inv.seeds,'Seeds'],['🍎',inv.produce,'Produce'],
+  const items=[['🪙',inv.gold,'Gold'],['🌾',inv.farm,'$FARM'],['🌱',inv.seeds,'Seeds'],['🍎',inv.produce,'Produce'],['🐟',inv.fish||0,'Fish'],
     ['🪵',inv.wood,'Wood'],['🪨',inv.stone,'Stone'],['💎',inv.crystal,'Crystal'],['🥚',inv.eggs,'Eggs'],['⭐',inv.stars,'Stars']];
   g.innerHTML=items.map(([e,v,n])=>`<div class="cell"><span class="em">${e}</span><span class="v">${v}</span>${n}</div>`).join('');
   flag.pouch=true; checkQuests();
@@ -385,7 +400,7 @@ function refreshPouch(){
 //=================== QUESTS ===================
 const quests=[
   {t:'Walk around the farm (WASD)', ok:()=>flag.moved},
-  {t:'Open your Pouch (E or slot 6)', ok:()=>flag.pouch},
+  {t:'Open your Pouch (press E)', ok:()=>flag.pouch},
   {t:'Till soil with the Hoe', ok:()=>flag.tilled>=1},
   {t:'Plant a seed (slot 5)', ok:()=>flag.planted>=1},
   {t:'Harvest a ripe crop', ok:()=>flag.harvested>=1},
@@ -452,6 +467,18 @@ function drawSoil(sx,sy){
   rect(sx+2,sy+2,TILE-4,TILE-4,'#6b4626');
   ctx.fillStyle='#5a3a1f';
   for(let i=6;i<TILE-4;i+=8) ctx.fillRect(sx+4,sy+i,TILE-8,2);
+}
+function drawWater(sx,sy,seed){
+  rect(sx,sy,TILE,TILE,'#3a8fc6');
+  ctx.fillStyle='#2e6fa0'; ctx.fillRect(sx,sy+TILE-9,TILE,9);
+  const t=performance.now()/600;
+  ctx.fillStyle='rgba(220,245,255,.45)';
+  for(let i=0;i<3;i++){
+    const yy=sy+9+i*12+Math.sin(t+seed+i)*2;
+    ctx.fillRect(sx+5+((seed*7+i*5)%12), yy, 11, 2);
+  }
+  ctx.fillStyle='rgba(255,255,255,.5)';
+  ctx.fillRect(sx+TILE-14, sy+6, 6, 2);
 }
 function drawTree(sx,sy){
   // shadow
@@ -534,7 +561,9 @@ function render(){
   // ground pass
   for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
     const sx=x*TILE-cam.x, sy=y*TILE-cam.y, c=map[y][x];
-    if(c.t==='soil'||c.crop) drawSoil(sx,sy); else drawGrass(sx,sy,(x*COLS+y));
+    if(c.t==='water') drawWater(sx,sy,(x*7+y*13));
+    else if(c.t==='soil'||c.crop) drawSoil(sx,sy);
+    else drawGrass(sx,sy,(x*COLS+y));
   }
 
   // glow under player (spotlight)
@@ -602,6 +631,36 @@ function canStand(px,py){
   const tx=Math.floor(px/TILE), ty=Math.floor((py+12)/TILE); // feet
   if(!inBounds(tx,ty))return false;
   return !solid(map[ty][tx].t);
+}
+
+//=================== FISHING & UNSTUCK ===================
+let fishing=false;
+function castRod(tx,ty){
+  if(!inBounds(tx,ty)||map[ty][tx].t!=='water'){ toast('🎣 Stand at the pond and face the water'); return; }
+  if(fishing){ toast('🎣 Already casting...'); return; }
+  fishing=true; spend(8); toast('🎣 Casting...');
+  setTimeout(()=>{
+    fishing=false;
+    const roll=Math.random();
+    if(roll<0.65){ inv.fish=(inv.fish||0)+1; gainXP(6); toast('🐟 Caught a fish!'); }
+    else if(roll<0.74){ inv.crystal++; gainXP(8); toast('💎 Fished up a crystal!'); }
+    else { toast('🌊 It got away — try again'); }
+    refreshHUD();
+  },1400);
+}
+function unstuck(){
+  const px=Math.floor(player.x/TILE), py=Math.floor(player.y/TILE);
+  for(let r=1;r<14;r++){
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(Math.abs(dx)!==r && Math.abs(dy)!==r) continue; // ring edge only
+      const tx=px+dx, ty=py+dy;
+      if(inBounds(tx,ty) && !solid(map[ty][tx].t)){
+        player.x=tx*TILE+TILE/2; player.y=ty*TILE+TILE/2;
+        toast('🧭 Unstuck!'); return;
+      }
+    }
+  }
+  player.x=COLS/2*TILE; player.y=ROWS/2*TILE; toast('🧭 Returned to spawn');
 }
 
 //=================== CREATURES — original "Farm Spirits" ===================
@@ -751,6 +810,7 @@ const Net = {
       if(grow>0){ c.crop=true; c.plantedAt=now-Math.min(this.MAXGROW,grow+off); }
       if(coop>0){ c.coopT=now-Math.min(this.MAXCOOP,coop+off); }
     });
+    carvePond();
     refreshHUD(); buildHotbar();
   },
   startAutosave(){
