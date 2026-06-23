@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sproutlands</title>
+<style>
+  :root{
+    --amber:#f4c542; --amber-d:#caa02e; --amber-dd:#9c7820;
+    --panel:#f7e2a4; --panel-d:#e7c878; --ink:#5b3d16; --ink-l:#7a5524;
+    --glow:#ffe98a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#1c1430;font-family:"Courier New",monospace}
+  #game{display:block;image-rendering:pixelated;width:100vw;height:100vh;cursor:crosshair}
+  .ui{position:fixed;color:var(--ink);text-shadow:0 1px 0 #fff6cf;letter-spacing:.5px;user-select:none}
+  /* pixel panel */
+  .panel{
+    background:var(--panel);
+    border:3px solid var(--amber);
+    box-shadow:0 0 0 3px var(--amber-dd), 0 6px 0 rgba(0,0,0,.25), inset 0 0 0 2px #fff6cf;
+    border-radius:6px;
+  }
+  /* TOP BAR */
+  #topbar{top:14px;left:50%;transform:translateX(-50%);display:flex;gap:0;padding:6px 8px;align-items:center}
+  .stat{display:flex;align-items:center;gap:6px;padding:2px 12px;border-right:2px dashed var(--panel-d);font-weight:bold;font-size:14px}
+  .stat:last-child{border-right:none}
+  .stat small{font-size:9px;color:var(--ink-l);display:block;line-height:1;letter-spacing:1px}
+  .stat .ic{width:22px;height:22px;display:grid;place-items:center;font-size:16px}
+  .xpwrap{width:60px;height:12px;background:#caa64f;border:2px solid var(--ink);border-radius:3px;overflow:hidden;margin-top:1px}
+  .xpwrap i{display:block;height:100%;background:linear-gradient(#9fe06a,#5fb83a);width:0%}
+  /* WATER bar top-left */
+  #waterbox{top:14px;left:14px;display:flex;align-items:center;gap:8px;padding:6px 10px}
+  #waterbar{width:120px;height:14px;background:#3a5d8f;border:2px solid var(--ink);border-radius:3px;overflow:hidden}
+  #waterbar i{display:block;height:100%;width:80%;background:linear-gradient(#bfe6ff,#4aa3e6)}
+  /* HOTBAR */
+  #hotbar{bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px}
+  .slot{width:64px;height:74px;background:var(--panel);border:2px solid var(--amber-d);border-radius:5px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;position:relative;transition:.08s}
+  .slot .em{font-size:26px;line-height:1}
+  .slot .lb{font-size:9px;font-weight:bold;letter-spacing:1px;color:var(--ink-l)}
+  .slot .ct{position:absolute;top:2px;right:4px;font-size:11px;font-weight:bold;color:#b5471f}
+  .slot.sel{background:var(--glow);border-color:#fff;box-shadow:0 0 14px 4px var(--glow),0 0 0 2px var(--amber-dd)}
+  .slot .key{position:absolute;bottom:2px;left:4px;font-size:9px;color:#aa8a44}
+  /* QUEST */
+  #quest{bottom:18px;right:18px;width:210px;padding:10px 12px}
+  #quest .qh{font-size:11px;font-weight:bold;color:#b5471f;letter-spacing:1px}
+  #quest .qt{font-size:14px;font-weight:bold;margin-top:3px;line-height:1.2}
+  #quest .qbar{margin-top:7px;height:8px;background:#caa64f;border:2px solid var(--ink);border-radius:3px;overflow:hidden}
+  #quest .qbar i{display:block;height:100%;background:linear-gradient(#9fe06a,#5fb83a);width:0%}
+  /* TOAST */
+  #toasts{bottom:110px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+  .toast{background:rgba(40,26,12,.86);color:#ffe7a8;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:bold;
+         border:2px solid var(--amber-d);animation:pop .3s, fade .4s 1.6s forwards;text-shadow:none}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  @keyframes fade{to{opacity:0;transform:translateY(-12px)}}
+  /* MODALS */
+  .modal{top:0;left:0;width:100%;height:100%;background:rgba(20,12,30,.6);display:none;place-items:center;z-index:50}
+  .modal.on{display:grid}
+  .sheet{width:min(560px,92vw);max-height:84vh;overflow:auto;padding:18px 20px}
+  .sheet h2{font-size:18px;color:#b5471f;letter-spacing:1px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
+  .sheet .x{cursor:pointer;font-size:18px;color:#b5471f;background:var(--panel-d);border:2px solid var(--amber-d);border-radius:5px;width:30px;height:30px;display:grid;place-items:center}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:12px}
+  .cell{background:#fff6dd;border:2px solid var(--amber-d);border-radius:6px;padding:8px;text-align:center;font-size:12px;font-weight:bold;color:var(--ink)}
+  .cell .em{font-size:24px;display:block}
+  .cell .v{font-size:16px;color:#b5471f}
+  .row{display:flex;justify-content:space-between;align-items:center;background:#fff6dd;border:2px solid var(--amber-d);border-radius:6px;padding:8px 10px;margin-top:7px;font-size:13px;font-weight:bold;color:var(--ink)}
+  button.b{background:var(--amber);border:2px solid var(--amber-dd);border-radius:5px;padding:6px 12px;font-weight:bold;color:var(--ink);
+           cursor:pointer;font-family:inherit;font-size:12px;box-shadow:inset 0 0 0 2px #fff6cf;letter-spacing:.5px}
+  button.b:hover{background:var(--glow)}
+  button.b:active{transform:translateY(1px)}
+  button.b:disabled{opacity:.45;cursor:not-allowed}
+  .note{font-size:11px;color:var(--ink-l);margin-top:10px;line-height:1.4}
+  .farmchip{display:inline-flex;align-items:center;gap:4px;background:#2c2440;color:#a8f0c0;border:2px solid #58d090;border-radius:14px;padding:2px 9px;font-size:12px;font-weight:bold}
+  /* INTRO */
+  #intro{top:0;left:0;width:100%;height:100%;background:rgba(20,12,30,.78);display:grid;place-items:center;z-index:60}
+  #intro .sheet{text-align:center}
+  #intro h1{font-size:30px;color:#b5471f;letter-spacing:2px;margin-bottom:6px}
+  #intro p{font-size:13px;color:var(--ink);line-height:1.7;margin:4px 0}
+  .keys{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:12px 0}
+  .kbd{background:#fff6dd;border:2px solid var(--amber-d);border-bottom-width:4px;border-radius:5px;padding:4px 9px;font-weight:bold;color:var(--ink);font-size:12px}
+  @media (max-width:560px){.stat{padding:2px 7px;font-size:12px}.slot{width:52px;height:62px}.slot .em{font-size:21px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- WATER -->
+<div id="waterbox" class="ui panel">
+  <span style="font-size:18px">💧</span>
+  <div id="waterbar"><i></i></div>
+  <span id="watertxt" style="font-size:12px;font-weight:bold">3000/3000</span>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar" class="ui panel">
+  <div class="stat"><span class="ic">🪙</span><span><small>GOLD</small><span id="s-gold">105</span></span></div>
+  <div class="stat"><span class="ic">⭐</span><span><small>STARS</small><span id="s-stars">0</span></span></div>
+  <div class="stat"><span class="ic">🚩</span><span><small>LV <span id="s-lv">1</span></small><span class="xpwrap"><i id="s-xp"></i></span></span></div>
+  <div class="stat"><span class="ic">🌱</span><span><small>SEEDS</small><span id="s-seeds">5/30</span></span></div>
+  <div class="stat"><span class="ic">🍎</span><span><small>PRODUCE</small><span id="s-prod">0</span></span></div>
+  <div class="stat"><span class="ic">🌾</span><span><small>$FARM</small><span id="s-farm">0</span></span></div>
+  <div class="stat"><span class="ic">🏴</span><span><small>LAND</small><span id="s-land">9</span></span></div>
+</div>
+
+<!-- HOTBAR -->
+<div id="hotbar" class="ui panel"></div>
+
+<!-- QUEST -->
+<div id="quest" class="ui panel">
+  <div class="qh">QUEST <span id="q-n">1</span>/<span id="q-t">11</span></div>
+  <div class="qt" id="q-text">Walk around the farm</div>
+  <div class="qbar"><i id="q-bar"></i></div>
+</div>
+
+<div id="toasts" class="ui"></div>
+
+<!-- POUCH MODAL -->
+<div id="m-pouch" class="modal ui">
+  <div class="sheet panel">
+    <h2>🎒 Pouch <span class="x" onclick="closeAll()">✕</span></h2>
+    <div class="grid" id="pouch-grid"></div>
+    <div class="note">Carry your harvest, materials and tokens here. Sell at the Market (press <b>M</b>) to turn produce into 🪙 gold and 🌾 $FARM.</div>
+  </div>
+</div>
+
+<!-- MARKET MODAL -->
+<div id="m-market" class="modal ui">
+  <div class="sheet panel">
+    <h2>🏪 Market &amp; Trading <span class="x" onclick="closeAll()">✕</span></h2>
+    <div id="market-sell"></div>
+    <h2 style="margin-top:16px;font-size:15px">🌾 $FARM Exchange <span class="farmchip">simulated</span></h2>
+    <div class="row"><span>Convert 100 🪙 → 1 🌾 $FARM</span><button class="b" onclick="convertFarm()">Convert 100🪙</button></div>
+    <div class="row"><span>Daily rewards pool — stake produce, earn a share</span><button class="b" id="claim-btn" onclick="claimDaily()">Claim daily 🌾</button></div>
+    <div class="note">⚠️ This is a <b>game-economy simulation</b>. No real cryptocurrency, wallet, or blockchain is connected — the "$FARM token" here is in-memory game currency so you can feel the play-to-earn loop while prototyping.</div>
+  </div>
+</div>
+
+<!-- INTRO -->
+<div id="intro" class="ui">
+  <div class="sheet panel">
+    <h1>🌱 SPROUTLANDS</h1>
+    <p>A pixel farming sim — plow, plant, harvest, ranch &amp; trade.</p>
+    <div class="keys">
+      <span class="kbd">W A S D — move</span>
+      <span class="kbd">SPACE / Click — use tool</span>
+      <span class="kbd">1–7 — pick tool</span>
+      <span class="kbd">🥅 Net + SPACE — catch spirits</span>
+      <span class="kbd">C — Farm Spirits</span>
+      <span class="kbd">E — pouch</span>
+      <span class="kbd">M — market</span>
+    </div>
+    <p style="font-size:12px;color:var(--ink-l)">The glowing tile in front of you is where your tool acts.<br>Follow the quest tracker (bottom-right) to learn the loop.</p>
+    <button class="b" style="margin-top:14px;font-size:15px;padding:9px 26px" onclick="document.getElementById('intro').style.display='none'">▶ PLAY</button>
+  </div>
+</div>
+
+<script>
+//=================== SETUP ===================
+const cv=document.getElementById('game'), ctx=cv.getContext('2d');
+const TILE=44, COLS=70, ROWS=70;
+let W,H;
+function resize(){W=cv.width=window.innerWidth;H=cv.height=window.innerHeight;}
+window.addEventListener('resize',resize); resize();
+ctx.imageSmoothingEnabled=false;
+
+//=================== STATE ===================
+const inv={gold:105,farm:0,stars:0,seeds:5,maxSeeds:30,produce:0,wood:0,stone:0,crystal:0,eggs:0};
+let level=1,xp=0,xpNext=100,land=9;
+let water=3000, waterMax=3000;
+let tools=[
+  {id:'hoe',em:'🔨',lb:'HOE',key:'1'},
+  {id:'axe',em:'🪓',lb:'AXE',key:'2'},
+  {id:'pickaxe',em:'⛏️',lb:'PICKAXE',key:'3'},
+  {id:'hammer',em:'🔧',lb:'HAMMER',key:'4'},
+  {id:'seeds',em:'🌱',lb:'SEEDS',key:'5'},
+  {id:'net',em:'🥅',lb:'NET',key:'6'},
+  {id:'pouch',em:'🎒',lb:'POUCH',key:'7'},
+];
+let sel=0;
+let dailyClaimed=false;
+
+const player={x:COLS/2*TILE, y:ROWS/2*TILE, dir:'down', speed:175, anim:0};
+const cam={x:0,y:0};
+const keys={};
+
+// flags for quests
+const flag={moved:false,pouch:false,tilled:0,planted:0,harvested:0,chopped:0,mined:0,sold:false,coop:false,eggs:false,farm:false};
+
+//=================== WORLD GEN ===================
+// each tile: {t, crop, plantedAt, coopT}
+const map=[];
+function rnd(a,b){return a+Math.random()*(b-a);}
+function gen(){
+  for(let y=0;y<ROWS;y++){map[y]=[];for(let x=0;x<COLS;x++)map[y][x]={t:'grass',crop:null,plantedAt:0,coopT:0,seed:((x*73+y*131)%997)/997};}
+  // scatter trees & rocks, leave a clearing around spawn
+  const cx=COLS/2, cy=ROWS/2;
+  for(let y=2;y<ROWS-2;y++)for(let x=2;x<COLS-2;x++){
+    const d=Math.hypot(x-cx,y-cy);
+    if(d<3.2)continue;                    // spawn clearing
+    const n=Math.random();
+    if(n<0.16) map[y][x].t='tree';
+    else if(n<0.205) map[y][x].t='rock';
+  }
+}
+gen();
+
+function solid(t){return t==='tree'||t==='rock'||t==='coop';}
+
+//=================== INPUT ===================
+addEventListener('keydown',e=>{
+  if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return; // don't hijack typing
+  keys[e.key.toLowerCase()]=true;
+  const k=e.key.toLowerCase();
+  if(k===' '){e.preventDefault(); useTool();}
+  if(k==='e'){toggleModal('m-pouch'); refreshPouch();}
+  if(k==='m'){toggleModal('m-market'); refreshMarket();}
+  if(k==='c'){ crittersPanel(); }
+  if(['1','2','3','4','5','6','7'].includes(k)){ selectSlot(+k-1); }
+});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+cv.addEventListener('mousedown',e=>{
+  const wx=e.clientX+cam.x, wy=e.clientY+cam.y;
+  const tx=Math.floor(wx/TILE), ty=Math.floor(wy/TILE);
+  const px=Math.floor(player.x/TILE), py=Math.floor(player.y/TILE);
+  if(Math.abs(tx-px)<=1 && Math.abs(ty-py)<=1){
+    // face the clicked tile
+    const dx=tx-px, dy=ty-py;
+    if(Math.abs(dx)>Math.abs(dy)) player.dir=dx<0?'left':'right';
+    else if(dy!==0) player.dir=dy<0?'up':'down';
+    useTool();
+  }
+});
+
+//=================== HOTBAR UI ===================
+const hotbar=document.getElementById('hotbar');
+function buildHotbar(){
+  hotbar.innerHTML='';
+  tools.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='slot'+(i===sel?' sel':'');
+    let ct = t.id==='seeds'?`<span class="ct">${inv.seeds}</span>`:'';
+    d.innerHTML=`<span class="em">${t.em}</span><span class="lb">${t.lb}</span><span class="key">${t.key}</span>${ct}`;
+    d.onclick=()=>selectSlot(i);
+    hotbar.appendChild(d);
+  });
+}
+function selectSlot(i){
+  sel=i; buildHotbar();
+  if(tools[i].id==='pouch'){toggleModal('m-pouch',true);refreshPouch();}
+}
+buildHotbar();
+
+//=================== ACTIONS ===================
+function actionTile(){
+  const px=Math.floor(player.x/TILE), py=Math.floor(player.y/TILE);
+  let tx=px,ty=py;
+  if(player.dir==='up')ty--; if(player.dir==='down')ty++;
+  if(player.dir==='left')tx--; if(player.dir==='right')tx++;
+  return {tx,ty};
+}
+function inBounds(x,y){return x>=0&&y>=0&&x<COLS&&y<ROWS;}
+
+function useTool(){
+  if(water<25){toast('💧 Out of water — wait to refill');return;}
+  const {tx,ty}=actionTile();
+  if(!inBounds(tx,ty))return;
+  const c=map[ty][tx];
+  const tool=tools[sel].id;
+
+  // harvest takes priority on any tool
+  if(c.crop && cropStage(c)>=3){ harvest(tx,ty); return; }
+
+  if(tool==='hoe'){
+    if(c.t==='grass'){ c.t='soil'; spend(8); gainXP(4); flag.tilled++; toast('🟫 Tilled soil'); checkQuests(); }
+    else toast('Use the Hoe on grass');
+  }
+  else if(tool==='seeds'){
+    if(c.t==='soil' && !c.crop){
+      if(inv.seeds<=0){toast('No seeds — buy some at Market (M)');return;}
+      inv.seeds--; c.crop=true; c.plantedAt=performance.now(); spend(10); gainXP(3); flag.planted++;
+      toast('🌱 Planted a crop'); buildHotbar(); checkQuests();
+    } else toast('Till the soil first (Hoe)');
+  }
+  else if(tool==='axe'){
+    if(c.t==='tree'){ c.t='grass'; const w=Math.floor(rnd(2,5)); inv.wood+=w; spend(14); gainXP(5); flag.chopped++;
+      if(Math.random()<0.35){inv.seeds=Math.min(inv.maxSeeds,inv.seeds+1);buildHotbar();}
+      toast('🪵 +'+w+' wood'); checkQuests(); }
+    else toast('Use the Axe on a tree');
+  }
+  else if(tool==='pickaxe'){
+    if(c.t==='rock'){ c.t='grass'; const s=Math.floor(rnd(1,4)); inv.stone+=s; spend(14); gainXP(5); flag.mined++;
+      let extra='';
+      if(Math.random()<0.22){inv.crystal++;extra=' +💎';}
+      toast('🪨 +'+s+' stone'+extra); checkQuests(); }
+    else toast('Use the Pickaxe on a rock');
+  }
+  else if(tool==='hammer'){
+    if(c.t==='coop'){ collectEggs(tx,ty); }
+    else if(c.t==='grass'){
+      if(inv.wood>=8){ c.t='coop'; c.coopT=performance.now(); inv.wood-=8; gainXP(8); flag.coop=true;
+        toast('🐔 Built a coop! (−8 🪵)'); checkQuests(); }
+      else toast('Need 8 🪵 wood to build a coop');
+    } else toast('Hammer builds on grass / collects from coops');
+  }
+  else if(tool==='net'){ tryCatch(); }
+  else if(tool==='pouch'){ toggleModal('m-pouch',true); refreshPouch(); }
+  refreshHUD();
+}
+
+function cropStage(c){
+  if(!c.crop)return -1;
+  const el=(performance.now()-c.plantedAt)/1000;
+  return Math.min(3, Math.floor(el/6)); // ~18s to mature
+}
+function harvest(tx,ty){
+  const c=map[ty][tx];
+  const yld=Math.floor(rnd(2,5));
+  inv.produce+=yld; c.crop=false; c.t='soil';
+  spend(6); gainXP(7); flag.harvested++;
+  // bonus seeds sometimes
+  if(Math.random()<0.5){inv.seeds=Math.min(inv.maxSeeds,inv.seeds+1);buildHotbar();}
+  toast('🍎 Harvested +'+yld+' produce'); checkQuests(); refreshHUD();
+}
+function collectEggs(tx,ty){
+  const c=map[ty][tx];
+  const ready=Math.floor((performance.now()-c.coopT)/8000); // 1 egg / 8s
+  if(ready<=0){toast('🥚 No eggs ready yet');return;}
+  const got=Math.min(ready,6);
+  inv.eggs+=got; c.coopT=performance.now(); gainXP(3*got); flag.eggs=true;
+  toast('🥚 Collected +'+got+' eggs'); checkQuests(); refreshHUD();
+}
+
+function spend(n){water=Math.max(0,water-n);}
+function gainXP(n){
+  xp+=n;
+  while(xp>=xpNext){xp-=xpNext; level++; xpNext=Math.floor(xpNext*1.35); land+=2; inv.maxSeeds+=5; inv.stars++;
+    toast('🎉 Level '+level+'! +2 land, +5 seed cap');}
+  refreshHUD();
+}
+
+//=================== ECONOMY ===================
+const PRICES={produce:12,wood:5,stone:7,eggs:9,crystal:40};
+function refreshMarket(){
+  const box=document.getElementById('market-sell'); box.innerHTML='';
+  const items=[['produce','🍎 Produce'],['wood','🪵 Wood'],['stone','🪨 Stone'],['eggs','🥚 Eggs'],['crystal','💎 Crystal']];
+  items.forEach(([k,name])=>{
+    const have=inv[k]||0;
+    const r=document.createElement('div'); r.className='row';
+    r.innerHTML=`<span>${name} — have <b>${have}</b> @ ${PRICES[k]}🪙</span>`;
+    const b=document.createElement('button'); b.className='b'; b.textContent='Sell all (+'+(have*PRICES[k])+'🪙)';
+    b.disabled=have<=0; b.onclick=()=>{inv.gold+=have*PRICES[k]; flag.sold=true; inv[k]=0; toast('Sold '+name); refreshMarket();refreshHUD();buildHotbar();checkQuests();};
+    r.appendChild(b); box.appendChild(r);
+  });
+  const buy=document.createElement('div'); buy.className='row';
+  buy.innerHTML=`<span>🌱 Buy 5 seeds — 30🪙</span>`;
+  const bb=document.createElement('button'); bb.className='b'; bb.textContent='Buy';
+  bb.disabled=inv.gold<30 || inv.seeds>=inv.maxSeeds;
+  bb.onclick=()=>{inv.gold-=30;inv.seeds=Math.min(inv.maxSeeds,inv.seeds+5);toast('+5 seeds');refreshMarket();refreshHUD();buildHotbar();};
+  buy.appendChild(bb); box.appendChild(buy);
+}
+function convertFarm(){
+  if(inv.gold<100){toast('Need 100🪙 to convert');return;}
+  inv.gold-=100; inv.farm+=1; flag.farm=true; toast('🌾 +1 $FARM'); refreshHUD();refreshMarket();checkQuests();
+}
+function claimDaily(){
+  if(dailyClaimed){toast('Daily reward already claimed');return;}
+  // simulated pool share: scaled by produce sold + level
+  const reward=Math.max(1, Math.round(level*1.5 + inv.produce*0.2));
+  inv.farm+=reward; dailyClaimed=true; flag.farm=true;
+  document.getElementById('claim-btn').disabled=true;
+  toast('🌾 Daily pool: +'+reward+' $FARM'); refreshHUD();checkQuests();
+}
+
+//=================== POUCH ===================
+function refreshPouch(){
+  const g=document.getElementById('pouch-grid'); if(!g)return;
+  const items=[['🪙',inv.gold,'Gold'],['🌾',inv.farm,'$FARM'],['🌱',inv.seeds,'Seeds'],['🍎',inv.produce,'Produce'],
+    ['🪵',inv.wood,'Wood'],['🪨',inv.stone,'Stone'],['💎',inv.crystal,'Crystal'],['🥚',inv.eggs,'Eggs'],['⭐',inv.stars,'Stars']];
+  g.innerHTML=items.map(([e,v,n])=>`<div class="cell"><span class="em">${e}</span><span class="v">${v}</span>${n}</div>`).join('');
+  flag.pouch=true; checkQuests();
+}
+
+//=================== QUESTS ===================
+const quests=[
+  {t:'Walk around the farm (WASD)', ok:()=>flag.moved},
+  {t:'Open your Pouch (E or slot 6)', ok:()=>flag.pouch},
+  {t:'Till soil with the Hoe', ok:()=>flag.tilled>=1},
+  {t:'Plant a seed (slot 5)', ok:()=>flag.planted>=1},
+  {t:'Harvest a ripe crop', ok:()=>flag.harvested>=1},
+  {t:'Chop a tree with the Axe', ok:()=>flag.chopped>=1},
+  {t:'Mine a rock with the Pickaxe', ok:()=>flag.mined>=1},
+  {t:'Sell produce at the Market (M)', ok:()=>flag.sold},
+  {t:'Build a chicken coop (Hammer)', ok:()=>flag.coop},
+  {t:'Collect eggs from a coop', ok:()=>flag.eggs},
+  {t:'Earn your first 🌾 $FARM', ok:()=>flag.farm},
+];
+let qi=0;
+function checkQuests(){
+  while(qi<quests.length && quests[qi].ok()){ qi++; if(qi<quests.length) toast('✅ Quest complete!'); }
+  if(qi>=quests.length){
+    document.getElementById('q-text').textContent='🏆 All quests done — keep farming!';
+    document.getElementById('q-n').textContent=quests.length;
+  }else{
+    document.getElementById('q-text').textContent=quests[qi].t;
+    document.getElementById('q-n').textContent=qi+1;
+  }
+  document.getElementById('q-bar').style.width=(qi/quests.length*100)+'%';
+  document.getElementById('q-t').textContent=quests.length;
+}
+
+//=================== MODALS / TOAST ===================
+function toggleModal(id,force){
+  const m=document.getElementById(id);
+  const on= force!==undefined?force : !m.classList.contains('on');
+  document.querySelectorAll('.modal').forEach(x=>x.classList.remove('on'));
+  if(on)m.classList.add('on');
+}
+function closeAll(){document.querySelectorAll('.modal').forEach(x=>x.classList.remove('on'));}
+let toastList=[];
+function toast(msg){
+  const d=document.createElement('div'); d.className='toast'; d.textContent=msg;
+  document.getElementById('toasts').appendChild(d);
+  setTimeout(()=>d.remove(),2100);
+}
+
+//=================== HUD ===================
+function refreshHUD(){
+  S('s-gold',inv.gold); S('s-stars',inv.stars); S('s-lv',level);
+  S('s-seeds',inv.seeds+'/'+inv.maxSeeds); S('s-prod',inv.produce); S('s-farm',inv.farm); S('s-land',land);
+  document.getElementById('s-xp').style.width=(xp/xpNext*100)+'%';
+  document.getElementById('waterbar').firstElementChild.style.width=(water/waterMax*100)+'%';
+  document.getElementById('watertxt').textContent=Math.round(water)+'/'+waterMax;
+}
+function S(id,v){document.getElementById(id).textContent=v;}
+
+//=================== SPRITES (procedural pixel-ish) ===================
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h);}
+function drawGrass(sx,sy,seed){
+  rect(sx,sy,TILE,TILE,'#5a9e3f');
+  // subtle checker
+  if(((Math.floor(sx/TILE)+Math.floor(sy/TILE))&1)) rect(sx,sy,TILE,TILE,'#56983b');
+  // detail blades
+  const r=(seed*9301+49297)%233280/233280;
+  ctx.fillStyle='#6fb04e';
+  for(let i=0;i<3;i++){const px=sx+((seed*7+i*53)%TILE), py=sy+((seed*13+i*29)%TILE); ctx.fillRect(px,py,3,3);}
+  ctx.fillStyle='#4d8a35'; ctx.fillRect(sx+((seed*3)%TILE),sy+((seed*5)%TILE),2,2);
+}
+function drawSoil(sx,sy){
+  rect(sx,sy,TILE,TILE,'#7a5230');
+  rect(sx+2,sy+2,TILE-4,TILE-4,'#6b4626');
+  ctx.fillStyle='#5a3a1f';
+  for(let i=6;i<TILE-4;i+=8) ctx.fillRect(sx+4,sy+i,TILE-8,2);
+}
+function drawTree(sx,sy){
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath();ctx.ellipse(sx+TILE/2,sy+TILE-6,TILE*0.42,7,0,0,7);ctx.fill();
+  // trunk
+  rect(sx+TILE/2-4,sy+TILE-20,8,16,'#6b4a2a');
+  // foliage layered blobs
+  const blob=(cx,cy,r,c)=>{ctx.fillStyle=c;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();};
+  blob(sx+TILE/2,sy+TILE-26,TILE*0.40,'#2f5e22');
+  blob(sx+TILE/2-6,sy+TILE-32,TILE*0.32,'#3f7a2e');
+  blob(sx+TILE/2+7,sy+TILE-30,TILE*0.30,'#3f7a2e');
+  blob(sx+TILE/2,sy+TILE-36,TILE*0.30,'#4f9036');
+  blob(sx+TILE/2-5,sy+TILE-40,TILE*0.18,'#6cb04a');
+}
+function drawRock(sx,sy){
+  ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(sx+TILE/2,sy+TILE-7,TILE*0.34,6,0,0,7);ctx.fill();
+  const poly=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);ctx.closePath();ctx.fill();};
+  const cx=sx+TILE/2, by=sy+TILE-8;
+  poly([[cx-14,by],[cx-9,by-18],[cx+4,by-22],[cx+14,by-10],[cx+11,by]],'#2e69b0');
+  poly([[cx-9,by-18],[cx+4,by-22],[cx+1,by-9],[cx-6,by-7]],'#4a90d9');
+  poly([[cx+4,by-22],[cx+14,by-10],[cx+6,by-8]],'#1f4e8a');
+  ctx.fillStyle='#bfe2ff';ctx.fillRect(cx-4,by-17,3,3);
+}
+function drawCoop(sx,sy){
+  ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(sx+TILE/2,sy+TILE-6,TILE*0.4,7,0,0,7);ctx.fill();
+  rect(sx+6,sy+16,TILE-12,TILE-20,'#c98a52'); // body
+  rect(sx+6,sy+16,TILE-12,4,'#a86b3b');
+  // roof
+  ctx.fillStyle='#8a3b2a';ctx.beginPath();ctx.moveTo(sx+2,sy+18);ctx.lineTo(sx+TILE/2,sy+4);ctx.lineTo(sx+TILE-2,sy+18);ctx.closePath();ctx.fill();
+  rect(sx+TILE/2-5,sy+24,10,12,'#5b3d16'); // door
+  ctx.font='12px serif';ctx.fillText('🐔',sx+TILE/2-7,sy+TILE-2);
+}
+function drawCrop(sx,sy,stg){
+  const cx=sx+TILE/2, by=sy+TILE-8;
+  if(stg<=0){ ctx.fillStyle='#7fc34a';ctx.fillRect(cx-2,by-8,4,8); return;}
+  ctx.strokeStyle='#3f7a2e';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(cx,by);ctx.lineTo(cx,by-10-stg*5);ctx.stroke();
+  ctx.fillStyle='#5fb83a';
+  const h=10+stg*5;
+  ctx.beginPath();ctx.ellipse(cx-6,by-h*0.6,6,3,0.5,0,7);ctx.fill();
+  ctx.beginPath();ctx.ellipse(cx+6,by-h*0.4,6,3,-0.5,0,7);ctx.fill();
+  if(stg>=3){ ctx.fillStyle='#e8513b'; ctx.beginPath();ctx.arc(cx,by-h-2,5,0,7);ctx.fill();
+    ctx.fillStyle='#ff8a6a';ctx.beginPath();ctx.arc(cx-1,by-h-3,2,0,7);ctx.fill(); }
+  else if(stg>=2){ ctx.fillStyle='#ffd84a';ctx.beginPath();ctx.arc(cx,by-h,3,0,7);ctx.fill(); }
+}
+function drawPlayer(sx,sy,bob){
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(sx,sy+16,12,5,0,0,7);ctx.fill();
+  const flip = player.dir==='left';
+  ctx.save(); ctx.translate(sx,sy+bob); if(flip)ctx.scale(-1,1);
+  // legs
+  rect(-6,4,5,9,'#3a5db0'); rect(1,4,5,9,'#3a5db0');
+  // body
+  rect(-8,-8,16,14,'#e25b4a');
+  rect(-8,-8,16,4,'#c4453a');
+  // arms
+  rect(-11,-6,4,9,'#d9a07a'); rect(7,-6,4,9,'#d9a07a');
+  // head
+  rect(-7,-22,14,14,'#f1c08a');
+  // hair
+  rect(-8,-23,16,6,'#7a4a24'); rect(-8,-23,5,11,'#7a4a24');
+  // eyes (facing)
+  if(player.dir!=='up'){ctx.fillStyle='#3a2a18';ctx.fillRect(-3,-15,2,2);ctx.fillRect(2,-15,2,2);}
+  ctx.restore();
+}
+
+//=================== RENDER ===================
+function render(){
+  ctx.imageSmoothingEnabled=false;
+  // camera
+  cam.x=Math.max(0,Math.min(player.x-W/2, COLS*TILE-W));
+  cam.y=Math.max(0,Math.min(player.y-H/2, ROWS*TILE-H));
+  if(COLS*TILE<W)cam.x=(COLS*TILE-W)/2;
+  if(ROWS*TILE<H)cam.y=(ROWS*TILE-H)/2;
+
+  rect(0,0,W,H,'#4d8a35');
+  const x0=Math.max(0,Math.floor(cam.x/TILE)-1), y0=Math.max(0,Math.floor(cam.y/TILE)-1);
+  const x1=Math.min(COLS,Math.ceil((cam.x+W)/TILE)+1), y1=Math.min(ROWS,Math.ceil((cam.y+H)/TILE)+1);
+
+  // ground pass
+  for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+    const sx=x*TILE-cam.x, sy=y*TILE-cam.y, c=map[y][x];
+    if(c.t==='soil'||c.crop) drawSoil(sx,sy); else drawGrass(sx,sy,(x*COLS+y));
+  }
+
+  // glow under player (spotlight)
+  const psx=player.x-cam.x, psy=player.y-cam.y;
+  const g=ctx.createRadialGradient(psx,psy,10,psx,psy,150);
+  g.addColorStop(0,'rgba(255,240,150,.45)'); g.addColorStop(1,'rgba(255,240,150,0)');
+  ctx.fillStyle=g; ctx.beginPath();ctx.arc(psx,psy,150,0,7);ctx.fill();
+
+  // action tile diamond
+  const {tx,ty}=actionTile();
+  if(inBounds(tx,ty)){
+    const dx=tx*TILE-cam.x+TILE/2, dy=ty*TILE-cam.y+TILE/2;
+    ctx.strokeStyle='rgba(255,240,140,.9)';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(dx,dy-TILE/2+4);ctx.lineTo(dx+TILE/2-4,dy);ctx.lineTo(dx,dy+TILE/2-4);ctx.lineTo(dx-TILE/2+4,dy);ctx.closePath();ctx.stroke();
+  }
+
+  // object pass (y-sorted for depth) + player + critters
+  const objs=[];
+  for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+    const c=map[y][x];
+    if(c.t==='tree'||c.t==='rock'||c.t==='coop'||c.crop) objs.push({x,y,c,sy:y*TILE+TILE});
+  }
+  for(const w of wild){ if(w.x>cam.x-50&&w.x<cam.x+W+50&&w.y>cam.y-50&&w.y<cam.y+H+50) objs.push({crit:w,sy:w.y}); }
+  objs.push({player:true,sy:player.y});
+  objs.sort((a,b)=>a.sy-b.sy);
+  for(const o of objs){
+    if(o.player){ const bob=Math.sin(player.anim)*(moving?2:0); drawPlayer(psx,psy,-bob); continue;}
+    if(o.crit){ drawCreature(o.crit.x-cam.x,o.crit.y-cam.y,o.crit.type,Math.sin(performance.now()/200+o.crit.x)*1.5); continue; }
+    const sx=o.x*TILE-cam.x, sy=o.y*TILE-cam.y, c=o.c;
+    if(c.crop) drawCrop(sx,sy,cropStage(c));
+    else if(c.t==='tree') drawTree(sx,sy);
+    else if(c.t==='rock') drawRock(sx,sy);
+    else if(c.t==='coop') drawCoop(sx,sy);
+  }
+}
+
+//=================== LOOP ===================
+let last=performance.now(), moving=false;
+function loop(t){
+  const dt=Math.min(0.05,(t-last)/1000); last=t;
+  // movement
+  let dx=0,dy=0;
+  if(keys['w']||keys['arrowup'])dy-=1;
+  if(keys['s']||keys['arrowdown'])dy+=1;
+  if(keys['a']||keys['arrowleft'])dx-=1;
+  if(keys['d']||keys['arrowright'])dx+=1;
+  moving = (dx||dy)!==0;
+  if(moving){
+    if(Math.abs(dx)>Math.abs(dy)) player.dir=dx<0?'left':'right'; else player.dir=dy<0?'up':'down';
+    const len=Math.hypot(dx,dy)||1; dx/=len;dy/=len;
+    const nx=player.x+dx*player.speed*dt, ny=player.y+dy*player.speed*dt;
+    if(canStand(nx,player.y))player.x=nx;
+    if(canStand(player.x,ny))player.y=ny;
+    player.anim+=dt*10;
+    if(!flag.moved){flag.moved=true;checkQuests();}
+  }
+  // water regen
+  water=Math.min(waterMax,water+12*dt);
+  updateCritters(dt);
+  refreshHUD();
+  render();
+  requestAnimationFrame(loop);
+}
+function canStand(px,py){
+  const tx=Math.floor(px/TILE), ty=Math.floor((py+12)/TILE); // feet
+  if(!inBounds(tx,ty))return false;
+  return !solid(map[ty][tx].t);
+}
+
+//=================== CREATURES — original "Farm Spirits" ===================
+const CREA={
+  sproutling:{name:'Sproutling',col:'#7fc34a',dark:'#3f7a2e',belly:'#cdeb9a',res:'produce',re:'🍎'},
+  mossback:{name:'Mossback',col:'#6d9bbf',dark:'#3a6ea5',belly:'#bfe2ff',res:'stone',re:'🪨'},
+  emberkit:{name:'Emberkit',col:'#e0884a',dark:'#b5471f',belly:'#ffd9b0',res:'wood',re:'🪵'},
+  puddlepip:{name:'Puddlepip',col:'#6fcfe0',dark:'#3aa0c0',belly:'#d8f6ff',res:'crystal',re:'💎'},
+};
+const CKEYS=Object.keys(CREA);
+let wild=[];
+const PROD_MS=20000, PROD_CAP=8;
+if(!inv.caught) inv.caught=[];
+
+function spawnOne(){
+  for(let t=0;t<40;t++){
+    const x=Math.floor(rnd(4,COLS-4)), y=Math.floor(rnd(4,ROWS-4));
+    if(map[y][x].t==='grass'){
+      wild.push({type:CKEYS[Math.floor(Math.random()*CKEYS.length)],x:x*TILE+TILE/2,y:y*TILE+TILE/2,tw:0,dx:0,dy:0,spook:0});
+      return;
+    }
+  }
+}
+function spawnCritters(){ wild=[]; for(let i=0;i<9;i++) spawnOne(); }
+
+function updateCritters(dt){
+  if(wild.length<9 && Math.random()<0.012) spawnOne();
+  for(const w of wild){
+    w.tw-=dt;
+    if(w.spook>0){ w.spook-=dt; const a=Math.atan2(w.y-player.y,w.x-player.x); w.dx=Math.cos(a); w.dy=Math.sin(a); }
+    else if(w.tw<=0){ w.tw=rnd(1.2,3); const a=rnd(0,6.283); w.dx=Math.random()<0.4?0:Math.cos(a); w.dy=Math.random()<0.4?0:Math.sin(a); }
+    const sp=(w.spook>0?72:34)*dt, nx=w.x+w.dx*sp, ny=w.y+w.dy*sp;
+    const tx=Math.floor(nx/TILE), ty=Math.floor(ny/TILE);
+    if(inBounds(tx,ty)&&!solid(map[ty][tx].t)){ w.x=nx; w.y=ny; } else { w.tw=0; }
+  }
+}
+
+function drawCreature(sx,sy,type,bob){
+  const c=CREA[type], b=sy-(bob||0);
+  ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(sx,sy+12,11,4,0,0,7);ctx.fill();
+  ctx.fillStyle=c.dark; // ears
+  ctx.beginPath();ctx.arc(sx-7,b-9,4,0,7);ctx.fill();
+  ctx.beginPath();ctx.arc(sx+7,b-9,4,0,7);ctx.fill();
+  ctx.fillStyle=c.col;ctx.beginPath();ctx.arc(sx,b,11,0,7);ctx.fill();      // body
+  ctx.fillStyle=c.belly;ctx.beginPath();ctx.arc(sx,b+3,6,0,7);ctx.fill();    // belly
+  ctx.fillStyle='#2a1c10';ctx.fillRect(sx-4,b-4,2,3);ctx.fillRect(sx+2,b-4,2,3); // eyes
+  ctx.fillStyle=c.dark;ctx.fillRect(sx-6,b+1,2,2);ctx.fillRect(sx+4,b+1,2,2);     // cheeks
+}
+
+function tryCatch(){
+  let best=null,bd=1e9;
+  for(const w of wild){ const d=Math.hypot(w.x-player.x,w.y-player.y); if(d<bd){bd=d;best=w;} }
+  if(!best||bd>TILE*1.7){ toast('🥅 No Farm Spirit nearby'); return; }
+  const chance=inv.produce>0?0.85:0.6;
+  if(inv.produce>0) inv.produce--; // a berry as bait
+  if(Math.random()<chance){
+    const c=CREA[best.type];
+    inv.caught.push({type:best.type,name:c.name,lvl:1,lastCollect:Date.now()});
+    wild=wild.filter(w=>w!==best);
+    gainXP(12); toast('✨ Befriended a '+c.name+'!');
+  } else { best.spook=1.6; toast('💨 It got spooked — try again'); }
+  refreshHUD();
+}
+
+function crittersPanel(){
+  let m=document.getElementById('m-crit');
+  if(!m){
+    m=document.createElement('div'); m.id='m-crit'; m.className='modal ui';
+    m.innerHTML='<div class="sheet panel"><h2>✨ Farm Spirits <span class="x" onclick="closeAll()">✕</span></h2>'
+      +'<div id="crit-body"></div><div class="note">Catch wild spirits with the 🥅 Net (slot 6) — get close and press SPACE. They live on your farm and make resources over time; collect them here. Carrying a 🍎 makes catching easier.</div></div>';
+    document.body.appendChild(m);
+  }
+  const body=m.querySelector('#crit-body');
+  if(!inv.caught || inv.caught.length===0){
+    body.innerHTML='<div class="row"><span>No spirits yet — find one roaming the fields and catch it with the Net!</span></div>';
+  } else {
+    body.innerHTML='';
+    inv.caught.forEach((ct)=>{
+      const c=CREA[ct.type], ready=Math.min(PROD_CAP,Math.floor((Date.now()-ct.lastCollect)/PROD_MS));
+      const r=document.createElement('div'); r.className='row';
+      r.innerHTML='<span>'+c.re+' <b>'+ct.name+'</b> Lv'+ct.lvl+' — '+ready+' '+c.re+' ready</span>';
+      const btn=document.createElement('button'); btn.className='b'; btn.textContent='Collect'; btn.disabled=ready<=0;
+      btn.onclick=()=>{ inv[c.res]=(inv[c.res]||0)+ready; if(ready>=PROD_CAP)ct.lvl++; ct.lastCollect=Date.now();
+        toast('+'+ready+' '+c.re+' from '+ct.name); refreshHUD(); buildHotbar(); crittersPanel(); };
+      r.appendChild(btn); body.appendChild(r);
+    });
+  }
+  toggleModal('m-crit',true);
+}
+
+spawnCritters();
+
+refreshHUD(); checkQuests(); buildHotbar();
+requestAnimationFrame(loop);
+</script>
+
+<!-- ===== LOGIN OVERLAY (added for online saving) ===== -->
+<div id="login" class="ui" style="position:fixed;inset:0;background:rgba(20,12,30,.88);display:grid;place-items:center;z-index:70">
+  <div class="sheet panel" style="text-align:center;width:min(360px,90vw)">
+    <h1 style="font-size:26px;color:#b5471f;letter-spacing:2px;margin-bottom:6px">🌱 SPROUTLANDS</h1>
+    <p style="font-size:12px;color:var(--ink);margin-bottom:14px;line-height:1.5">Make an account so your farm saves<br>and follows you to any device.</p>
+    <input id="lg-user" placeholder="username" maxlength="24" autocomplete="off"
+      style="width:100%;padding:9px;margin:4px 0;border:2px solid var(--amber-d);border-radius:5px;background:#fff6dd;font-family:inherit;font-size:14px;color:var(--ink)">
+    <input id="lg-pass" type="password" placeholder="password" autocomplete="off"
+      style="width:100%;padding:9px;margin:4px 0;border:2px solid var(--amber-d);border-radius:5px;background:#fff6dd;font-family:inherit;font-size:14px;color:var(--ink)">
+    <div id="lg-msg" style="color:#b5471f;font-size:11px;min-height:15px;margin:6px 0;font-weight:bold"></div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button class="b" style="flex:1" onclick="Net.auth('login')">Log in</button>
+      <button class="b" style="flex:1" onclick="Net.auth('register')">Register</button>
+    </div>
+    <button class="b" style="margin-top:10px;background:var(--panel-d);font-size:11px" onclick="Net.guest()">Play offline (no save)</button>
+  </div>
+</div>
+<div id="savebadge" class="ui panel" style="display:none;position:fixed;bottom:18px;left:18px;padding:5px 10px;font-size:11px;font-weight:bold">💾 <span id="saveuser"></span></div>
+
+<script>
+/* ===== NETCODE: same-origin, talks to this server's /api ===== */
+const API = ""; // same origin — server serves both game and API
+const Net = {
+  token:null, user:null, MAXGROW:18000, MAXCOOP:48000,
+  msg(t){ const m=document.getElementById('lg-msg'); if(m)m.textContent=t; },
+  async call(path, method, body){
+    const r = await fetch(API+path,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+    return r.json();
+  },
+  snapshot(){
+    const tiles=[];
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+      const c=map[y][x];
+      if(c.t!=='grass'||c.crop){
+        const grow=c.crop?(performance.now()-c.plantedAt):0;
+        const coop=c.coopT?(performance.now()-c.coopT):0;
+        tiles.push([x,y,c.t,Math.round(grow),Math.round(coop)]);
+      }
+    }
+    return {inv,level,xp,xpNext,land,water,px:player.x,py:player.y,tiles,savedAt:Date.now()};
+  },
+  apply(s){
+    if(!s)return;
+    Object.assign(inv,s.inv||{}); level=s.level||level; xp=s.xp||0; xpNext=s.xpNext||xpNext;
+    land=s.land||land; if(typeof s.water==='number')water=s.water;
+    if(s.px){player.x=s.px;player.y=s.py;}
+    const off=Math.max(0,Date.now()-(s.savedAt||Date.now())); const now=performance.now();
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)Object.assign(map[y][x],{t:'grass',crop:null,coopT:0});
+    (s.tiles||[]).forEach(([x,y,t,grow,coop])=>{
+      const c=map[y][x]; c.t=t;
+      if(grow>0){ c.crop=true; c.plantedAt=now-Math.min(this.MAXGROW,grow+off); }
+      if(coop>0){ c.coopT=now-Math.min(this.MAXCOOP,coop+off); }
+    });
+    refreshHUD(); buildHotbar();
+  },
+  startAutosave(){
+    setInterval(()=>{ if(this.token) this.call('/api/save','POST',{token:this.token,state:this.snapshot()}); },8000);
+    window.addEventListener('beforeunload',()=>{
+      if(this.token&&navigator.sendBeacon)
+        navigator.sendBeacon(API+'/api/save',JSON.stringify({token:this.token,state:this.snapshot()}));
+    });
+  },
+  async auth(mode){
+    const user=document.getElementById('lg-user').value.trim();
+    const pass=document.getElementById('lg-pass').value;
+    if(!user||!pass){this.msg('Enter a username and password');return;}
+    this.msg('...');
+    const res=await this.call('/api/'+mode,'POST',{user,pass});
+    if(res.error){this.msg(res.error);return;}
+    this.token=res.token; this.user=res.user;
+    const loaded=await this.call('/api/load?token='+res.token,'GET');
+    this.apply(loaded.state);
+    this.startAutosave();
+    document.getElementById('saveuser').textContent=res.user;
+    document.getElementById('savebadge').style.display='block';
+    document.getElementById('login').style.display='none';
+  },
+  guest(){ document.getElementById('login').style.display='none'; },
+};
+</script>
+
+</body>
+</html>
