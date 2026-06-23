@@ -1,0 +1,8 @@
+{
+  "name": "sproutlands",
+  "version": "1.0.0",
+  "description": "Sproutlands — async-multiplayer browser farming game",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
