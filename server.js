@@ -1,6 +1,6 @@
 /**
- * Sproutlands — single Railway service that serves BOTH the game (static files in
- * /public) and the save API. Zero npm dependencies: `node server.js`.
+ * Sproutlands — single Railway service that serves the game (static files) and
+ * the save API from one folder. Zero npm dependencies: `node server.js`.
  *
  * IMPORTANT (Railway): the default filesystem is EPHEMERAL — data.json is wiped
  * on every redeploy/restart, so saves would vanish. Two fixes:
@@ -14,7 +14,8 @@ const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = process.env.DATA_FILE || './data.json';
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = __dirname; // all files in root (no /public folder)
+const BLOCK = new Set(['data.json', 'server.js', 'package.json']); // never serve these
 
 // ---- storage (in-memory + debounced write-through) ----
 let db = { users: {} };
@@ -54,6 +55,7 @@ function serveStatic(req, res) {
   if (rel === '/') rel = '/index.html';
   const filePath = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!filePath.startsWith(PUBLIC_DIR)) return sendJSON(res, 403, { error: 'no' }); // traversal guard
+  if (BLOCK.has(path.basename(filePath))) return sendJSON(res, 403, { error: 'no' }); // hide server/db files
   fs.readFile(filePath, (err, data) => {
     if (err) {
       // fall back to the game shell for unknown routes
